@@ -11,6 +11,7 @@ services:
         CONFIG: default-config.ini # Config to load from `configs` folder.
         WEAPONS: default-weapons.ini # Weapons file to apply to a server (only if APPLYWEAPONS is true)
         APPLYWEAPONS: "false" # Overwrite weapons.ini from `configs/WEAPONS` (default false)
+        GLIBC_VERSION: "2.35-r0" # Version of glibc to install from https://github.com/sgerrand/alpine-pkg-glibc (used with gcompat)
     deploy:
       replicas: 1
       restart_policy:

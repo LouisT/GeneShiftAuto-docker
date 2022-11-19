@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM alpine:latest
 
 LABEL maintainer="https://github.com/LouisT/GeneShiftAuto-docker"
 
@@ -9,11 +9,10 @@ ARG SOURCE=https://geneshiftauto.com/downloads/GeneShiftAuto-latest.tar.gz
 ARG CONFIG=default-config.ini
 ARG WEAPONS=default-weapons.ini
 ARG APPLYWEAPONS="false"
-ARG PUID=1000
-ARG PGID=1000
+ARG GLIBC_VERSION=2.35-r0
 
 # Install deps
-ARG DEPS="wget bash tar ca-certificates"
+ARG DEPS="wget bash tar ca-certificates gcompat"
 
 # setup env
 ENV PORT="$PORT" \
@@ -22,26 +21,34 @@ ENV PORT="$PORT" \
   CONFIG="$CONFIG" \
   WEAPONS="$WEAPONS" \
   APPLYWEAPONS="$APPLYWEAPONS" \
-  PUID="$PUID" \
-  PGID="$PGID"
+  GLIBC_VERSION="${GLIBC_VERSION}"
 
 # Setup initial GSA user + home dir/bash scripts
 RUN mkdir -p /opt/GSA /opt/data
-RUN useradd -d /opt/GSA gsa
+RUN apk add doas; \
+  adduser gsa; \
+  # TODO: Improve password setting!? This is used for `docker exec` for shell access.
+  echo 'gsa:gsa-password' | chpasswd; \
+  echo 'permit gsa as root' > /etc/doas.d/doas.conf \
+  echo 'permit persist :wheel as root' >> /etc/doas.d/doas.conf
 ADD files/*.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/gsa-*.sh && chown -R gsa /usr/local/bin/gsa-*.sh
 
 # Setup base folders/files + install needed deps
-RUN apt-get update ; apt-get install -y --no-install-recommends $DEPS
+RUN apk add --update $DEPS
+
+# Download and install glibc
+RUN wget -nv -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub \
+  && wget -nv https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk \
+  && apk add --force-overwrite glibc-${GLIBC_VERSION}.apk
 
 # Install latest su-exec + cleanup
 RUN set -ex; \
   wget -nv -O /usr/local/bin/su-exec.c https://raw.githubusercontent.com/ncopa/su-exec/master/su-exec.c; \
-  fetch_deps='gcc libc-dev'; apt-get install -y --no-install-recommends $fetch_deps; \
-  rm -rf /var/lib/apt/lists/*; gcc -Wall /usr/local/bin/su-exec.c -o/usr/local/bin/su-exec; \
-  chown root:root /usr/local/bin/su-exec; chmod 0755 /usr/local/bin/su-exec; \
-  rm /usr/local/bin/su-exec.c; apt-get purge -y --auto-remove $fetch_deps \
-  && apt-get clean && rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
+  fetch_deps='gcc libc-dev'; apk add --update $fetch_deps; rm -rf /var/lib/apt/lists/*; \
+  gcc -Wall /usr/local/bin/su-exec.c -o/usr/local/bin/su-exec; chown root:root /usr/local/bin/su-exec; \
+  chmod 0755 /usr/local/bin/su-exec; rm /usr/local/bin/su-exec.c; apk del $fetch_deps \
+  rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 
 # Fetch and uncompress Gene Shift Auto
 RUN wget -nv -O- "$SOURCE" | tar -xz -C /opt/GSA
