@@ -1,7 +1,7 @@
 version: '3'
 services:
-  gsa:
-    container_name: gsa
+  gsa-alpine:
+    container_name: gsa-alpine
     build:
       context: .
       args:
