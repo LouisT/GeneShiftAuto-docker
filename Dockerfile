@@ -1,8 +1,5 @@
 FROM ubuntu:latest
 
-STOPSIGNAL SIGTERM
-
-# Add a label pointing to my GitHub repo!?
 LABEL maintainer="https://github.com/LouisT/GeneShiftAuto-docker"
 
 # Default args
@@ -11,12 +8,12 @@ ARG USERNAME=docker
 ARG SOURCE=https://geneshiftauto.com/downloads/GeneShiftAuto-latest.tar.gz
 ARG CONFIG=default-config.ini
 ARG WEAPONS=default-weapons.ini
-ARG APPLYWEAPONS=false
+ARG APPLYWEAPONS="false"
 ARG PUID=1000
 ARG PGID=1000
 
 # Install deps
-ARG DEPS="wget curl bash tar ca-certificates"
+ARG DEPS="wget bash tar ca-certificates"
 
 # setup env
 ENV PORT="$PORT" \
@@ -37,24 +34,17 @@ RUN chmod +x /usr/local/bin/gsa-*.sh && chown -R gsa /usr/local/bin/gsa-*.sh
 # Setup base folders/files + install needed deps
 RUN apt-get update ; apt-get install -y --no-install-recommends $DEPS
 
-# Install latest su-exec
+# Install latest su-exec + cleanup
 RUN set -ex; \
   wget -nv -O /usr/local/bin/su-exec.c https://raw.githubusercontent.com/ncopa/su-exec/master/su-exec.c; \
-  fetch_deps='gcc libc-dev'; \
-  apt-get install -y --no-install-recommends $fetch_deps; \
-  rm -rf /var/lib/apt/lists/*; \
-  gcc -Wall /usr/local/bin/su-exec.c -o/usr/local/bin/su-exec; \
-  chown root:root /usr/local/bin/su-exec; \
-  chmod 0755 /usr/local/bin/su-exec; \
-  rm /usr/local/bin/su-exec.c; \
-  apt-get purge -y --auto-remove $fetch_deps
-
-# Clear unused files
-RUN apt-get clean && \
-  rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
+  fetch_deps='gcc libc-dev'; apt-get install -y --no-install-recommends $fetch_deps; \
+  rm -rf /var/lib/apt/lists/*; gcc -Wall /usr/local/bin/su-exec.c -o/usr/local/bin/su-exec; \
+  chown root:root /usr/local/bin/su-exec; chmod 0755 /usr/local/bin/su-exec; \
+  rm /usr/local/bin/su-exec.c; apt-get purge -y --auto-remove $fetch_deps \
+  && apt-get clean && rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 
 # Fetch and uncompress Gene Shift Auto
-RUN curl -fL "$SOURCE" | tar -xz -C /opt/GSA
+RUN wget -nv -O- "$SOURCE" | tar -xz -C /opt/GSA
 
 # Copy configs
 COPY configs/${CONFIG} /opt/GSA/GeneShiftAuto/data/config.ini
